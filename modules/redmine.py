@@ -1,4 +1,5 @@
 import datetime
+import re
 
 import yaml
 import requests
@@ -55,7 +56,7 @@ def _build_subissue_suffix(subissue, parent_issue):
 
 
 def get_issues_names_by_prefix(issues_prefix:str, config:dict) -> list[str]:
-    # TODO: how to avoid this code repetition?
+    # TODO: how to avoid this code repetition here and in post_issue?
     project_url = str(config.get("project-url"))
     username = str(config.get("username"))
     password = str(config.get("password"))
@@ -70,7 +71,7 @@ def get_issues_names_by_prefix(issues_prefix:str, config:dict) -> list[str]:
     issues = res.json().get("issues")
     issues_names = []
     for issue in issues:
-        issues_names.append(issue.get("subject"))
+        issues_names.append(re.sub(fr"{issues_prefix}[\d]*: ", "", issue.get("subject")))
 
     return issues_names
 
@@ -110,19 +111,16 @@ def create_sprint_issues(sprint_filepath:str, config_filepath:str):
     sprint["start-date"] = sprint.get("start-date").strftime("%Y-%m-%d")
     sprint["due-date"] = sprint.get("due-date").strftime("%Y-%m-%d")
 
-    # TODO: change this to prune the prefix and, inside the for, check if the
-    # name (before add the prefix) is in registered_issues. The way it is now,
-    # an order change in the sprint file would create duplicate issues
     registered_issues:list[str] = get_issues_names_by_prefix(sprint.get("issues-prefix"), config)
 
     registered_issues_count = len(registered_issues)
 
     issues:list[dict] = sprint.get("issues")
     for issue in issues:
-        issue_prefix = f"{sprint.get('issues-prefix')}{registered_issues_count+1:02d}: "
-        issue["subject"] = f"{issue_prefix}{issue.get('subject')}"
         if issue.get("subject") in registered_issues: continue
         registered_issues_count += 1
+        issue_prefix = f"{sprint.get('issues-prefix')}{registered_issues_count:02d}: "
+        issue["subject"] = f"{issue_prefix}{issue.get('subject')}"
 
         issue["start-date"] = sprint.get("start-date")
         issue["due-date"] = sprint.get("due-date")
@@ -135,7 +133,6 @@ def create_sprint_issues(sprint_filepath:str, config_filepath:str):
         subissues = issue.get("subissues")
         if subissues is None: continue
         for subissue in subissues:
-            # if subissue.get("subject") in registered_issues: continue
             registered_issues_count += 1
 
             subissue_prefix = f"{sprint.get('issues-prefix')}{registered_issues_count:02d}: "
