@@ -3,6 +3,8 @@ import datetime
 import yaml
 import requests
 
+from modules import util
+
 
 def _check_issues(issues:list[dict]):
     REQUIRED_ISSUE_KEYS = [
@@ -46,7 +48,7 @@ def _check_sprint(sprint:dict):
     _check_issues(sprint.get("issues")) # type: ignore
 
 
-def post_issue(issue:dict, config:dict):
+def post_issue(issue:dict, config:dict) -> requests.Response:
     project_url = str(config.get("project-url"))
     username = str(config.get("username"))
     password = str(config.get("password"))
@@ -63,7 +65,7 @@ def post_issue(issue:dict, config:dict):
     return res
 
 
-def create(filepath, config_path):
+def create(filepath:str, config_path:str):
     with open(filepath, "r") as f:
         sprint = yaml.load(f, Loader=yaml.FullLoader)
     with open(config_path, "r") as c:
@@ -79,6 +81,10 @@ def create(filepath, config_path):
         issue = issues[i]
         issue_prefix = f"{sprint.get('issues-prefix')}{i+1:02d}: "
         issue["subject"] = f"{issue_prefix}{issue.get('subject')}"
+        issue["start-date"] = sprint.get("start-date")
+        issue["due-date"] = sprint.get("due-date")
+
+        issue = util._replace_hyphen_with_underscore(issue)
 
         res = post_issue(issue, config)
         print(res.json())
