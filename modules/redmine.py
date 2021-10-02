@@ -48,6 +48,12 @@ def _check_sprint(sprint:dict):
     _check_issues(sprint.get("issues")) # type: ignore
 
 
+def _build_subissue_suffix(subissue, parent_issue):
+    p = f"{parent_issue.get('prefix')}".removesuffix(": ")
+    suffix = subissue.get("suffix").replace("%p", p)
+    return suffix
+
+
 def get_issues_names_by_prefix(issues_prefix:str, config:dict) -> list[str]:
     # TODO: how to avoid this code repetition?
     project_url = str(config.get("project-url"))
@@ -69,7 +75,7 @@ def get_issues_names_by_prefix(issues_prefix:str, config:dict) -> list[str]:
     return issues_names
 
 
-def post_issue(issue:dict, config:dict) -> requests.Response:
+def post_issue(issue:dict, config:dict):
     project_url = str(config.get("project-url"))
     username = str(config.get("username"))
     password = str(config.get("password"))
@@ -82,8 +88,15 @@ def post_issue(issue:dict, config:dict) -> requests.Response:
     auth = (username, password)
 
     res = requests.post(url, json=json, headers=headers, auth=auth)
+    status_code = res.status_code
+    assert status_code == 201, f"Status Code {status_code} during creation of: {issue.get('subject')}"
 
-    return res
+    created_issue = res.json().get("issue")
+    created_issue_id = created_issue.get("id")
+    created_issue_name = created_issue.get("subject")
+    print(f"Issue {created_issue_id} created: {created_issue_name}")
+
+    return created_issue
 
 
 def create_sprint_issues(sprint_filepath:str, config_filepath:str):
@@ -98,28 +111,43 @@ def create_sprint_issues(sprint_filepath:str, config_filepath:str):
     sprint["due-date"] = sprint.get("due-date").strftime("%Y-%m-%d")
 
     # TODO: change this to prune the prefix and, inside the for, check if the
-    # name (before add the prefix) is in created_issues. The way it is now, an
-    # order change in the sprint file would create duplicate issues
-    created_issues:list[str] = get_issues_names_by_prefix(sprint.get("issues-prefix"), config)
+    # name (before add the prefix) is in registered_issues. The way it is now,
+    # an order change in the sprint file would create duplicate issues
+    registered_issues:list[str] = get_issues_names_by_prefix(sprint.get("issues-prefix"), config)
+
+    registered_issues_count = len(registered_issues)
+
     issues:list[dict] = sprint.get("issues")
-    for i in range(len(issues)):
-        issue = issues[i]
-        issue_prefix = f"{sprint.get('issues-prefix')}{i+1:02d}: "
+    for issue in issues:
+        issue_prefix = f"{sprint.get('issues-prefix')}{registered_issues_count+1:02d}: "
         issue["subject"] = f"{issue_prefix}{issue.get('subject')}"
-        if issue.get("subject") in created_issues: continue
+        if issue.get("subject") in registered_issues: continue
+        registered_issues_count += 1
 
         issue["start-date"] = sprint.get("start-date")
         issue["due-date"] = sprint.get("due-date")
 
         issue = util._replace_hyphen_with_underscore(issue)
 
-        res = post_issue(issue, config)
-        status_code = res.status_code
-        assert status_code == 201, f"Status Code {status_code} during creation of: {issue.get('subject')}"
-        created_issue = res.json().get("issue")
-        created_issue_id = created_issue.get("id")
-        created_issue_name = created_issue.get("subject")
-        print(f"Issue {created_issue_id} created: {created_issue_name}")
+        created_issue = post_issue(issue, config)
+        created_issue["prefix"] = issue_prefix
+
+        subissues = issue.get("subissues")
+        if subissues is None: continue
+        for subissue in subissues:
+            # if subissue.get("subject") in registered_issues: continue
+            registered_issues_count += 1
+
+            subissue_prefix = f"{sprint.get('issues-prefix')}{registered_issues_count:02d}: "
+            subissue_suffix = _build_subissue_suffix(subissue, created_issue)
+            subissue["subject"] = f"{subissue_prefix}{subissue.get('subject')} {subissue_suffix}"
+
+            subissue["start-date"] = sprint.get("start-date")
+            subissue["due-date"] = sprint.get("due-date")
+
+            subissue = util._replace_hyphen_with_underscore(subissue)
+
+            post_issue(subissue, config)
 
     print(f"Create from {sprint_filepath}")
     return True
