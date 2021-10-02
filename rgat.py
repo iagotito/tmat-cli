@@ -2,17 +2,20 @@
 
 Usage:
     rgat.py config
+    rgat.py redmine create <file>
 
 Options:
     -h --help  Show this screen.
     --version  Show version.
 
 """
+import os
 import getpass
 
 import yaml
 
 from modules.docopt import docopt
+from modules import redmine
 
 
 def create_config_file():
@@ -31,6 +34,14 @@ def main():
 
     if arguments.get("config"):
         create_config_file()
+
+    elif arguments.get("redmine"):
+        if arguments.get("create"):
+            filepath = os.path.abspath(str(arguments.get("<file>")))
+            try:
+                redmine.create(filepath)
+            except AssertionError as e:
+                print(str(e))
 
 
 if __name__ == '__main__':
