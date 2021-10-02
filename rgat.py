@@ -20,7 +20,7 @@ from modules import redmine
 
 def create_config_file():
     config = {}
-    config["project_url"] = input("Project url: ")
+    config["project-url"] = input("Project url: ")
     # TODO: use api key to avoid write login info in a file
     config["username"] = input("Usarname: ")
     config["password"] = getpass.getpass("Password: ")
@@ -38,8 +38,9 @@ def main():
     elif arguments.get("redmine"):
         if arguments.get("create"):
             filepath = os.path.abspath(str(arguments.get("<file>")))
+            config_path = os.path.abspath("./config.yaml")
             try:
-                redmine.create(filepath)
+                redmine.create(filepath, config_path)
             except AssertionError as e:
                 print(str(e))
 

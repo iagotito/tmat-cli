@@ -1,5 +1,7 @@
-import yaml
 import datetime
+
+import yaml
+import requests
 
 
 def _check_issues(issues:list[dict]):
@@ -44,14 +46,42 @@ def _check_sprint(sprint:dict):
     _check_issues(sprint.get("issues")) # type: ignore
 
 
-def create(filepath):
+def post_issue(issue:dict, config:dict):
+    project_url = str(config.get("project-url"))
+    username = str(config.get("username"))
+    password = str(config.get("password"))
+
+    url = f"{project_url}/issues.json"
+    json = { "issue": issue }
+    headers = {
+        "Contnt-Type": "application/json"
+    }
+    auth = (username, password)
+
+    res = requests.post(url, json=json, headers=headers, auth=auth)
+
+    return res
+
+
+def create(filepath, config_path):
     with open(filepath, "r") as f:
         sprint = yaml.load(f, Loader=yaml.FullLoader)
+    with open(config_path, "r") as c:
+        config = yaml.load(c, Loader=yaml.FullLoader)
 
     _check_sprint(sprint)
 
     sprint["start-date"] = sprint.get("start-date").strftime("%Y-%m-%d")
     sprint["due-date"] = sprint.get("due-date").strftime("%Y-%m-%d")
-    print(sprint)
+
+    issues:list[dict] = sprint.get("issues")
+    for i in range(len(issues)):
+        issue = issues[i]
+        issue_prefix = f"{sprint.get('issues-prefix')}{i+1:02d}: "
+        issue["subject"] = f"{issue_prefix}{issue.get('subject')}"
+
+        res = post_issue(issue, config)
+        print(res.json())
+
     print(f"Create from {filepath}")
     return True
