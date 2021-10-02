@@ -48,6 +48,27 @@ def _check_sprint(sprint:dict):
     _check_issues(sprint.get("issues")) # type: ignore
 
 
+def get_issues_names_by_prefix(issues_prefix:str, config:dict) -> list[str]:
+    # TODO: how to avoid this code repetition?
+    project_url = str(config.get("project-url"))
+    username = str(config.get("username"))
+    password = str(config.get("password"))
+
+    url = f"{project_url}/issues.json?subject=~{issues_prefix}&limit=99"
+    headers = {
+        "Contnt-Type": "application/json"
+    }
+    auth = (username, password)
+
+    res = requests.get(url, headers=headers, auth=auth)
+    issues = res.json().get("issues")
+    issues_names = []
+    for issue in issues:
+        issues_names.append(issue.get("subject"))
+
+    return issues_names
+
+
 def post_issue(issue:dict, config:dict) -> requests.Response:
     project_url = str(config.get("project-url"))
     username = str(config.get("username"))
@@ -65,10 +86,10 @@ def post_issue(issue:dict, config:dict) -> requests.Response:
     return res
 
 
-def create(filepath:str, config_path:str):
-    with open(filepath, "r") as f:
+def create_sprint_issues(sprint_filepath:str, config_filepath:str):
+    with open(sprint_filepath, "r") as f:
         sprint = yaml.load(f, Loader=yaml.FullLoader)
-    with open(config_path, "r") as c:
+    with open(config_filepath, "r") as c:
         config = yaml.load(c, Loader=yaml.FullLoader)
 
     _check_sprint(sprint)
@@ -76,18 +97,29 @@ def create(filepath:str, config_path:str):
     sprint["start-date"] = sprint.get("start-date").strftime("%Y-%m-%d")
     sprint["due-date"] = sprint.get("due-date").strftime("%Y-%m-%d")
 
+    # TODO: change this to prune the prefix and, inside the for, check if the
+    # name (before add the prefix) is in created_issues. The way it is now, an
+    # order change in the sprint file would create duplicate issues
+    created_issues:list[str] = get_issues_names_by_prefix(sprint.get("issues-prefix"), config)
     issues:list[dict] = sprint.get("issues")
     for i in range(len(issues)):
         issue = issues[i]
         issue_prefix = f"{sprint.get('issues-prefix')}{i+1:02d}: "
         issue["subject"] = f"{issue_prefix}{issue.get('subject')}"
+        if issue.get("subject") in created_issues: continue
+
         issue["start-date"] = sprint.get("start-date")
         issue["due-date"] = sprint.get("due-date")
 
         issue = util._replace_hyphen_with_underscore(issue)
 
         res = post_issue(issue, config)
-        print(res.json())
+        status_code = res.status_code
+        assert status_code == 201, f"Status Code {status_code} during creation of: {issue.get('subject')}"
+        created_issue = res.json().get("issue")
+        created_issue_id = created_issue.get("id")
+        created_issue_name = created_issue.get("subject")
+        print(f"Issue {created_issue_id} created: {created_issue_name}")
 
-    print(f"Create from {filepath}")
+    print(f"Create from {sprint_filepath}")
     return True

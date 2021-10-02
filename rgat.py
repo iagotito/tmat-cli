@@ -40,7 +40,7 @@ def main():
             filepath = os.path.abspath(str(arguments.get("<file>")))
             config_path = os.path.abspath("./config.yaml")
             try:
-                redmine.create(filepath, config_path)
+                redmine.create_sprint_issues(filepath, config_path)
             except AssertionError as e:
                 print(str(e))
 
