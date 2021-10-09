@@ -1,7 +1,7 @@
 ## Commit Message Guidelines
 
 ```
-Short (72 chars or less) summary
+Short (50 chars or less) summary
 
 More detailed explanatory text. Wrap it to 72 characters. The blank
 line separating the summary from the body is critical (unless you omit
