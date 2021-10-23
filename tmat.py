@@ -1,8 +1,8 @@
-"""Redmine and Github Automation Tool (RGAT)
+"""Task Manager Automation Tool (TMAT)
 
 Usage:
-    rgat.py config
-    rgat.py redmine create <file>
+    tmat.py config
+    tmat.py redmine create <file>
 
 Options:
     -h --help  Show this screen.
@@ -30,7 +30,7 @@ def create_config_file():
 
 
 def main():
-    arguments = docopt(__doc__, version="RGAT 0.1")
+    arguments = docopt(__doc__, version="TMAT 0.1")
 
     if arguments.get("config"):
         create_config_file()
